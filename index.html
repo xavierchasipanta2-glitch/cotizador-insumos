@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Cotizador">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>Cotizador de insumos</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>🦷 Cotizador de insumos</h1>
+    <span id="saved" class="saved">✓ Guardado</span>
+  </header>
+
+  <main id="app"></main>
+
+  <nav class="tabs">
+    <button class="tab active" data-view="sesiones">📋<span>Sesiones</span></button>
+    <button class="tab" data-view="sesion">🧾<span>Cotizar</span></button>
+    <button class="tab" data-view="locales">🏪<span>Locales</span></button>
+  </nav>
+
+  <dialog id="storeDialog">
+    <form id="storeForm" autocomplete="off">
+      <h2 id="sd-title">Nuevo local</h2>
+
+      <label class="lbl" for="sd-nombre">Nombre del local *</label>
+      <input class="in gris" id="sd-nombre" required placeholder="Ej: Dental Norte">
+
+      <label class="lbl" for="sd-telefono">Teléfono</label>
+      <input class="in gris" id="sd-telefono" type="tel" inputmode="tel" placeholder="Ej: 099 123 4567">
+
+      <label class="lbl" for="sd-direccion">Dirección</label>
+      <input class="in gris" id="sd-direccion" placeholder="Calle, número, sector, ciudad">
+
+      <label class="lbl" for="sd-horario">Horarios</label>
+      <input class="in gris" id="sd-horario" placeholder="Ej: Lun-Vie 8:30-18:00, Sáb 9:00-13:00">
+
+      <label class="lbl" for="sd-notas">Notas</label>
+      <textarea class="in gris" id="sd-notas" rows="2" placeholder="Ej: hacen descuento por volumen, atiende Marcela"></textarea>
+
+      <div class="row gap end">
+        <button type="button" class="btn" id="sd-cancel">Cancelar</button>
+        <button type="submit" class="btn primary">Guardar local</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
