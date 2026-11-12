@@ -1,6 +1,6 @@
 :root {
-  --teal: #0f766e;
-  --teal-dark: #115e59;
+  --teal: #1e56a0;        /* azul principal (el de la imagen de inicio) */
+  --teal-dark: #164282;
   --bg: #f8fafc;
   --text: #0f172a;
   --muted: #64748b;
@@ -27,6 +27,22 @@ body {
   line-height: 1.35;
 }
 
+/* ---------- Pantalla de inicio (splash) ---------- */
+#splash {
+  position: fixed; inset: 0; z-index: 1000;
+  background: #1e56a0;
+  display: flex; align-items: center; justify-content: center;
+  animation: splashOut .5s ease 1.9s forwards; /* se oculta sola aunque falle el JS */
+}
+#splash img {
+  width: 100%; height: auto; max-height: 100%; object-fit: contain; display: block;
+  /* difumina los bordes de la imagen con el fondo azul para que no se vea la costura */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%);
+}
+#splash.gone { display: none; }
+@keyframes splashOut { to { opacity: 0; visibility: hidden; } }
+
 /* ---------- Barra superior ---------- */
 .topbar {
   position: sticky; top: 0; z-index: 20;
@@ -52,7 +68,7 @@ main { padding: 12px 10px calc(84px + env(safe-area-inset-bottom)); max-width: 1
   display: flex; flex-direction: column; align-items: center; gap: 1px;
 }
 .tab span { font-size: .72rem; font-weight: 600; }
-.tab.active { color: var(--teal); background: #f0fdfa; box-shadow: inset 0 3px 0 var(--teal); }
+.tab.active { color: var(--teal); background: #eff6ff; box-shadow: inset 0 3px 0 var(--teal); }
 
 /* ---------- Tarjetas y texto ---------- */
 .card {
@@ -84,7 +100,7 @@ a { color: var(--teal-dark); }
   width: 100%; padding: 9px 10px; font-size: 1rem; font-family: inherit;
   border: 2px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--text);
 }
-.in:focus { outline: none; box-shadow: 0 0 0 3px rgba(15,118,110,.25); }
+.in:focus { outline: none; box-shadow: 0 0 0 3px rgba(30,86,160,.28); }
 .in.azul { background: var(--azul-bg); border-color: var(--azul-bd); }
 .in.gris { background: var(--gris-bg); border-color: var(--gris-bd); }
 .in.precio { background: var(--amar-bg); border-color: var(--amar-bd); font-weight: 600; }

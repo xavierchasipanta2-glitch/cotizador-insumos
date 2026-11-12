@@ -1,5 +1,5 @@
 // Cambia este número cada vez que actualices la app para que los teléfonos descarguen la versión nueva.
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const CACHE = 'cotizador-insumos-' + VERSION;
 
 const ASSETS = [
@@ -8,9 +8,10 @@ const ASSETS = [
   './styles.css',
   './app.js',
   './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-512.png'
+  './splash.jpg',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-512.png'
 ];
 
 self.addEventListener('install', (event) => {

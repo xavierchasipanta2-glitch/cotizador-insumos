@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.0.0';
+  const APP_VERSION = '1.1.0';
   const KEY = 'cotizador-insumos-v1';
 
   /* =====================================================
@@ -737,6 +737,14 @@
      ===================================================== */
   if (state.ultima && state.sessions.some((x) => x.id === state.ultima)) ui.sessionId = state.ultima;
   render();
+
+  // Pantalla de inicio: se quita sola (también con un toque)
+  const splash = document.getElementById('splash');
+  if (splash) {
+    const quitar = () => splash.classList.add('gone');
+    splash.addEventListener('click', quitar);
+    setTimeout(quitar, 2500);
+  }
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

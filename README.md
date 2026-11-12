@@ -11,15 +11,15 @@ styles.css
 app.js
 manifest.json
 service-worker.js
-icons/icon-192.png
-icons/icon-512.png
-icons/icon-maskable-512.png
+icon-192.png
+icon-512.png
+icon-maskable-512.png
 ```
 
 ## Publicar en GitHub Pages
 
 1. Crea un repositorio nuevo en GitHub (por ejemplo `cotizador-insumos`).
-2. Sube todos estos archivos a la raíz del repositorio (respetando la carpeta `icons/`).
+2. Sube todos estos archivos a la raíz del repositorio (sin subcarpetas).
 3. En el repositorio: **Settings → Pages → Build and deployment**.
    - Source: **Deploy from a branch**
    - Branch: **main** y carpeta **/ (root)** → Save.
