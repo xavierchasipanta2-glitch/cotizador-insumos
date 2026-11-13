@@ -1,14 +1,14 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.1.1';
+  const APP_VERSION = '1.2.0';
   const KEY = 'cotizador-insumos-v1';
 
   /* =====================================================
      Estado y almacenamiento (todo queda en el teléfono)
      ===================================================== */
   let state = load();
-  const ui = { view: 'sesiones', sessionId: null, editingStoreId: null, addToSession: false };
+  const ui = { view: 'sesiones', sessionId: null, editingStoreId: null, addToSession: false, buyStore: null };
 
   function load() {
     try {
@@ -121,7 +121,7 @@
       mixed += r.min * qtyOf(r.item);
       mixedN++;
       if (!byStore.has(st.id)) byStore.set(st.id, []);
-      byStore.get(st.id).push({ item: r.item, price: r.min });
+      byStore.get(st.id).push({ item: r.item, price: r.min, max: r.max, filled: r.filled });
     });
 
     const completes = totals.filter((t) => t.complete);
@@ -353,37 +353,108 @@
     }
     if (sinPrecio) html += `<p class="warn">⚠️ ${sinPrecio} material(es) aún sin ningún precio.</p>`;
 
-    html += `<div class="row gap wrap" style="margin-top:12px">
+    html += `<button class="btn primary big" style="margin-top:12px" data-act="goto-buy">🛒 Ver qué comprar en cada tienda ↓</button>
+      <div class="row gap wrap" style="margin-top:10px">
         <button class="btn small" data-act="share-wa">📲 Compartir por WhatsApp</button>
         <button class="btn small" data-act="export-csv">📥 Descargar para Excel</button>
       </div></div>`;
     return html;
   }
 
+  const PALETA = ['#0d9488', '#4f46e5', '#db2777', '#c2410c', '#0e7490', '#4d7c0f', '#7e22ce', '#a16207'];
+  const colorOf = (st) => PALETA[Math.max(0, state.stores.findIndex((x) => x.id === st.id)) % PALETA.length];
+
+  function sumsOf(list) {
+    return {
+      n: list.length,
+      sub: list.reduce((a, x) => a + x.price * qtyOf(x.item), 0),
+      done: list.filter((x) => x.item.comprado).length,
+      save: list.reduce((a, x) => a + (x.filled >= 2 && x.max > x.price ? (x.max - x.price) * qtyOf(x.item) : 0), 0)
+    };
+  }
+
+  function buyCard(st, list) {
+    const color = colorOf(st);
+    const s = sumsOf(list);
+    const pct = s.n ? Math.round((s.done / s.n) * 100) : 0;
+    const head = `
+      <div class="buy-top">
+        <div class="buy-title">🏪 ${esc(st.nombre)}</div>
+        <div class="buy-links">
+          ${st.telefono ? `<a class="pill-link" href="tel:${esc(tel(st.telefono))}">📞 ${esc(st.telefono)}</a>` : ''}
+          ${st.direccion ? `<a class="pill-link" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(st.direccion)}">📍 Cómo llegar</a>` : ''}
+        </div>
+        ${st.horario ? `<div class="buy-hours">🕒 ${esc(st.horario)}</div>` : ''}
+      </div>`;
+
+    if (!list.length) {
+      return `<div class="buy-card" style="--sc:${color}">${head}
+        <p class="empty" style="padding:14px">En este local no sale más barato ningún material.</p></div>`;
+    }
+
+    return `
+      <div class="buy-card" style="--sc:${color}">
+        ${head}
+        <div class="buy-progress">
+          <div class="bar"><span style="width:${pct}%"></span></div>
+          <small>${s.done === s.n ? '✅ ¡Todo comprado en este local!' : `${s.done} de ${s.n} comprados`}</small>
+        </div>
+        <ul>
+          ${list.map((x) => {
+            const q = qtyOf(x.item);
+            const ahorro = x.filled >= 2 && x.max > x.price ? (x.max - x.price) * q : 0;
+            return `
+            <li class="${x.item.comprado ? 'done' : ''}">
+              <label>
+                <input type="checkbox" data-act="toggle-bought" data-id="${x.item.id}" ${x.item.comprado ? 'checked' : ''}>
+                <span class="bi-name">${esc(x.item.nombre)}
+                  <small>× ${esc(x.item.cantidad || 1)} ${esc(x.item.unidad)} · ${money(x.price)} c/u${ahorro > 0.004 ? ` · <em class="sv">💚 ahorras ${money(ahorro)}</em>` : ''}</small>
+                </span>
+              </label>
+              <b>${money(x.price * q)}</b>
+            </li>`;
+          }).join('')}
+        </ul>
+        <div class="buy-foot">
+          <div>Subtotal <b>${money(s.sub)}</b></div>
+          ${s.save > 0.004 ? `<div class="save">💚 Ahorras ${money(s.save)} aquí</div>` : ''}
+        </div>
+        <div class="buy-actions">
+          <button class="btn small" data-act="share-store" data-id="${st.id}">📲 Enviar esta lista por WhatsApp</button>
+        </div>
+      </div>`;
+  }
+
   function buyHTML(c) {
     if (!c.byStore.size) return '';
-    let html = `<div class="card"><h2>🛒 Qué comprar dónde</h2>`;
-    c.stores.forEach((st) => {
-      const list = c.byStore.get(st.id);
-      if (!list) return;
-      const sub = list.reduce((a, x) => a + x.price * qtyOf(x.item), 0);
-      html += `
-        <div class="buy-store">
-          <div class="buy-head"><b>🏪 ${esc(st.nombre)}</b>
-            ${st.telefono ? `<a href="tel:${esc(tel(st.telefono))}">📞 ${esc(st.telefono)}</a>` : ''}
-          </div>
-          <ul>
-            ${list.map((x) => `
-              <li class="${x.item.comprado ? 'done' : ''}">
-                <label><input type="checkbox" data-act="toggle-bought" data-id="${x.item.id}" ${x.item.comprado ? 'checked' : ''}>
-                  ${esc(x.item.nombre)} × ${esc(x.item.cantidad || 1)} ${esc(x.item.unidad)}</label>
-                <span>${money(x.price)} → <b>${money(x.price * qtyOf(x.item))}</b></span>
-              </li>`).join('')}
-          </ul>
-          <div class="buy-sub">Subtotal: <b>${money(sub)}</b></div>
-        </div>`;
-    });
-    return html + '</div>';
+    const valid = ui.buyStore === 'all' || c.stores.some((st) => st.id === ui.buyStore);
+    const sel = valid ? ui.buyStore : c.stores.find((st) => c.byStore.has(st.id)).id;
+
+    const pills = c.stores.map((st) => {
+      const list = c.byStore.get(st.id) || [];
+      const s = sumsOf(list);
+      return `<button class="spill ${sel === st.id ? 'on' : ''} ${list.length ? '' : 'empty'}" style="--sc:${colorOf(st)}" data-act="buy-store" data-id="${st.id}">
+        <span class="sp-name">${esc(st.nombre)}</span>
+        <span class="sp-sub">${list.length ? `${s.n} mat. · ${money(s.sub)}` : 'nada aquí'}</span>
+      </button>`;
+    }).join('');
+
+    const todas = `<button class="spill ${sel === 'all' ? 'on' : ''}" style="--sc:#334155" data-act="buy-store" data-id="all">
+        <span class="sp-name">Todas</span>
+        <span class="sp-sub">${c.mixedN} mat. · ${money(c.mixed)}</span>
+      </button>`;
+
+    const cards = sel === 'all'
+      ? c.stores.filter((st) => c.byStore.has(st.id)).map((st) => buyCard(st, c.byStore.get(st.id))).join('')
+      : buyCard(getStore(sel), c.byStore.get(sel) || []);
+
+    return `
+      <div class="card buy-section">
+        <h2>🛒 Qué comprar dónde</h2>
+        <p class="muted" style="margin:-4px 0 10px">Toca una tienda para ver solo lo que ahí te conviene comprar.</p>
+        <div class="pills">${pills}${todas}</div>
+        ${cards}
+      </div>`;
   }
 
   /* ---------- Locales ---------- */
@@ -506,23 +577,33 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
-  function shareWhatsApp() {
+  function shareWhatsApp(onlyId) {
     const s = getSession();
     if (!s) return;
     const c = calc(s);
-    let t = `🦷 *${s.titulo}* — ${fmtFecha(s.fecha)}\nQué comprar y dónde (lo más barato por material):\n`;
+    let t = onlyId
+      ? `🦷 *${s.titulo}* — ${fmtFecha(s.fecha)}\nLista para comprar en esta tienda:\n`
+      : `🦷 *${s.titulo}* — ${fmtFecha(s.fecha)}\nQué comprar y dónde (lo más barato por material):\n`;
+    let total = 0;
     c.stores.forEach((st) => {
+      if (onlyId && st.id !== onlyId) return;
       const list = c.byStore.get(st.id);
       if (!list) return;
       t += `\n🏪 *${st.nombre}*${st.telefono ? ' · ' + st.telefono : ''}\n`;
+      if (st.direccion) t += `📍 ${st.direccion}\n`;
+      if (st.horario) t += `🕒 ${st.horario}\n`;
       list.forEach((x) => {
         t += `• ${x.item.nombre} ×${x.item.cantidad || 1} ${x.item.unidad || ''} — ${money(x.price)} c/u = ${money(x.price * qtyOf(x.item))}\n`;
       });
-      t += `Subtotal: ${money(list.reduce((a, x) => a + x.price * qtyOf(x.item), 0))}\n`;
+      const sub = list.reduce((a, x) => a + x.price * qtyOf(x.item), 0);
+      total += sub;
+      t += `Subtotal: ${money(sub)}\n`;
     });
-    t += `\n💰 *Total: ${money(c.mixed)}*`;
-    const sin = c.rows.filter((r) => r.min === null).map((r) => r.item.nombre);
-    if (sin.length) t += `\n⚠️ Sin precio: ${sin.join(', ')}`;
+    t += onlyId ? `\n💰 *Total: ${money(total)}*` : `\n💰 *Total: ${money(c.mixed)}*`;
+    if (!onlyId) {
+      const sin = c.rows.filter((r) => r.min === null).map((r) => r.item.nombre);
+      if (sin.length) t += `\n⚠️ Sin precio: ${sin.join(', ')}`;
+    }
     window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank');
   }
 
@@ -660,6 +741,13 @@
       }
 
       case 'share-wa': shareWhatsApp(); break;
+      case 'share-store': shareWhatsApp(id); break;
+      case 'buy-store': ui.buyStore = id; refreshComputed(); break;
+      case 'goto-buy': {
+        const w = $('#buy-wrap');
+        if (w) w.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        break;
+      }
       case 'export-csv': exportCSV(); break;
       case 'export-backup': exportBackup(); break;
       case 'import-backup': $('#import-file').click(); break;
