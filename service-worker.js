@@ -1,5 +1,5 @@
 // Cambia este número cada vez que actualices la app para que los teléfonos descarguen la versión nueva.
-const VERSION = '1.2.1';
+const VERSION = '1.3.0';
 const CACHE = 'cotizador-insumos-' + VERSION;
 
 const ASSETS = [

@@ -49,11 +49,39 @@
       <label class="lbl" for="sd-notas">Notas</label>
       <textarea class="in gris" id="sd-notas" rows="2" placeholder="Ej: hacen descuento por volumen, atiende Marcela"></textarea>
 
+      <label class="lbl">Foto del local</label>
+      <div class="sd-photo">
+        <div id="sd-prev" class="sd-prev"><span>Sin foto</span></div>
+        <div class="sd-photo-btns">
+          <button type="button" class="btn small" id="sd-cam-btn">📷 Tomar foto</button>
+          <button type="button" class="btn small" id="sd-gal-btn">🖼️ Galería</button>
+          <button type="button" class="btn small danger" id="sd-del-btn" hidden>Quitar</button>
+        </div>
+        <input type="file" id="sd-cam" accept="image/*" capture="environment" hidden>
+        <input type="file" id="sd-gal" accept="image/*" hidden>
+      </div>
+
       <div class="row gap end">
         <button type="button" class="btn" id="sd-cancel">Cancelar</button>
         <button type="submit" class="btn primary">Guardar local</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="photoDialog">
+    <h2 id="pd-title">Foto</h2>
+    <div class="pd-frame">
+      <img id="pd-img" alt="" hidden>
+      <p id="pd-empty" class="empty">Aún no hay foto. Toma una o elígela de la galería.</p>
+    </div>
+    <div class="pd-actions">
+      <button type="button" class="btn primary" id="pd-cam-btn">📷 Tomar foto</button>
+      <button type="button" class="btn" id="pd-gal-btn">🖼️ Galería</button>
+      <button type="button" class="btn danger" id="pd-del" hidden>🗑 Quitar foto</button>
+      <button type="button" class="btn" id="pd-close">Cerrar</button>
+    </div>
+    <input type="file" id="pd-cam" accept="image/*" capture="environment" hidden>
+    <input type="file" id="pd-gal" accept="image/*" hidden>
   </dialog>
 
   <div id="toast" class="toast" role="status"></div>

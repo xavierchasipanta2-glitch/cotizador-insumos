@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.2.1';
+  const APP_VERSION = '1.3.0';
   const KEY = 'cotizador-insumos-v1';
 
   /* =====================================================
@@ -31,6 +31,7 @@
   let savedTimer;
   function save() {
     try {
+      gcPhotos();
       localStorage.setItem(KEY, JSON.stringify(state));
       const el = document.getElementById('saved');
       el.classList.add('show');
@@ -83,6 +84,90 @@
     const p = sess.prices[itemId] && sess.prices[itemId][storeId];
     const v = p ? parseFloat(p.precio) : NaN;
     return isFinite(v) && v > 0 ? v : null;
+  }
+
+  /* =====================================================
+     Fotos (se guardan comprimidas en IndexedDB, dentro del teléfono)
+     ===================================================== */
+  const FOTOS = { db: null, cache: new Map(), avisado: false };
+  const fotoURL = (id) => (id && FOTOS.cache.get(id)) || null;
+
+  function avisoFotos() {
+    if (FOTOS.avisado) return;
+    FOTOS.avisado = true;
+    toast('⚠️ Este navegador no permite guardar las fotos de forma permanente');
+  }
+
+  function fotosInit() {
+    return new Promise((resolve) => {
+      try {
+        if (!window.indexedDB) { resolve(); return; }
+        const rq = indexedDB.open('cotizador-fotos', 1);
+        rq.onupgradeneeded = () => rq.result.createObjectStore('fotos');
+        rq.onerror = () => resolve();
+        rq.onsuccess = () => {
+          FOTOS.db = rq.result;
+          try {
+            const cur = FOTOS.db.transaction('fotos').objectStore('fotos').openCursor();
+            cur.onsuccess = () => {
+              const c = cur.result;
+              if (c) { FOTOS.cache.set(c.key, c.value); c.continue(); } else resolve();
+            };
+            cur.onerror = () => resolve();
+          } catch (e) { resolve(); }
+        };
+      } catch (e) { resolve(); }
+    });
+  }
+
+  function fotoSet(id, data) {
+    FOTOS.cache.set(id, data);
+    if (!FOTOS.db) { avisoFotos(); return; }
+    try {
+      const tx = FOTOS.db.transaction('fotos', 'readwrite');
+      tx.objectStore('fotos').put(data, id);
+      tx.onerror = avisoFotos;
+    } catch (e) { avisoFotos(); }
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* opcional */ }
+  }
+
+  function fotoDel(id) {
+    FOTOS.cache.delete(id);
+    if (!FOTOS.db) return;
+    try { FOTOS.db.transaction('fotos', 'readwrite').objectStore('fotos').delete(id); } catch (e) { /* nada */ }
+  }
+
+  // Borra las fotos que ya no usa ningún local ni material
+  function gcPhotos() {
+    if (!FOTOS.cache.size) return;
+    const usadas = new Set();
+    state.stores.forEach((st) => { if (st.foto) usadas.add(st.foto); });
+    state.sessions.forEach((s) => s.items.forEach((it) => { if (it.foto) usadas.add(it.foto); }));
+    Array.from(FOTOS.cache.keys()).forEach((k) => { if (!usadas.has(k)) fotoDel(k); });
+  }
+
+  // Reduce la foto (lado mayor 900 px, JPEG) para que ocupe poco espacio
+  function procesarFoto(file, maxLado = 900, calidad = 0.72) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const k = Math.min(1, maxLado / Math.max(img.naturalWidth, img.naturalHeight));
+          const w = Math.max(1, Math.round(img.naturalWidth * k));
+          const h = Math.max(1, Math.round(img.naturalHeight * k));
+          const cv = document.createElement('canvas');
+          cv.width = w; cv.height = h;
+          const ctx = cv.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(cv.toDataURL('image/jpeg', calidad));
+        } catch (e) { reject(e); } finally { URL.revokeObjectURL(url); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('imagen no válida')); };
+      img.src = url;
+    });
   }
 
   /* =====================================================
@@ -262,6 +347,7 @@
       <tr data-item="${it.id}" class="${it.comprado ? 'done' : ''}">
         <td class="c-item">
           <textarea class="nm" rows="2" data-field="name" data-id="${it.id}" aria-label="Nombre del material">${esc(it.nombre)}</textarea>
+          <button class="ph-btn" data-act="item-photo" data-id="${it.id}" title="Foto del producto">${fotoURL(it.foto) ? `<img src="${fotoURL(it.foto)}" alt=""><span>Ver</span>` : '📷<span>Foto</span>'}</button>
         </td>
         <td class="c-qty">
           <input class="in azul qty" type="number" inputmode="decimal" min="0" step="any" data-field="qty" data-id="${it.id}" value="${esc(it.cantidad)}">
@@ -381,7 +467,8 @@
     const s = sumsOf(list);
     const pct = s.n ? Math.round((s.done / s.n) * 100) : 0;
     const head = `
-      <div class="buy-top">
+      <div class="buy-top ${fotoURL(st.foto) ? 'has-photo' : ''}">
+        ${fotoURL(st.foto) ? `<img class="buy-photo" src="${fotoURL(st.foto)}" alt="" data-act="store-photo" data-id="${st.id}">` : ''}
         <div class="buy-title">🏪 ${esc(st.nombre)}</div>
         <div class="buy-links">
           ${st.telefono ? `<a class="pill-link" href="tel:${esc(tel(st.telefono))}">📞 ${esc(st.telefono)}</a>` : ''}
@@ -408,6 +495,7 @@
             const ahorro = x.filled >= 2 && x.max > x.price ? (x.max - x.price) * q : 0;
             return `
             <li class="${x.item.comprado ? 'done' : ''}">
+              ${fotoURL(x.item.foto) ? `<img class="bi-photo" src="${fotoURL(x.item.foto)}" alt="" data-act="item-photo" data-id="${x.item.id}">` : ''}
               <label>
                 <input type="checkbox" data-act="toggle-bought" data-id="${x.item.id}" ${x.item.comprado ? 'checked' : ''}>
                 <span class="bi-name">${esc(x.item.nombre)}
@@ -464,12 +552,16 @@
   function storeCard(st, conAcciones) {
     return `
       <div class="card gris-card store-card">
-        <div class="st-title">🏪 ${esc(st.nombre)}</div>
+        <div class="st-head">
+          <div class="st-title">🏪 ${esc(st.nombre)}</div>
+          ${fotoURL(st.foto) ? `<img class="st-photo" src="${fotoURL(st.foto)}" alt="" data-act="store-photo" data-id="${st.id}">` : ''}
+        </div>
         ${st.telefono ? `<div>📞 <a href="tel:${esc(tel(st.telefono))}">${esc(st.telefono)}</a></div>` : ''}
         ${st.direccion ? `<div>📍 <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(st.direccion)}">${esc(st.direccion)}</a></div>` : ''}
         ${st.horario ? `<div>🕒 ${esc(st.horario)}</div>` : ''}
         ${st.notas ? `<div class="muted">📝 ${esc(st.notas)}</div>` : ''}
         <div class="row gap wrap">
+          <button class="btn small" data-act="store-photo" data-id="${st.id}">📷 ${fotoURL(st.foto) ? 'Foto' : 'Agregar foto'}</button>
           <button class="btn small" data-act="edit-store" data-id="${st.id}">✏️ Editar</button>
           ${conAcciones ? `<button class="btn small danger" data-act="del-store" data-id="${st.id}">Eliminar</button>` : ''}
         </div>
@@ -498,6 +590,8 @@
     const st = id ? getStore(id) || {} : {};
     $('#sd-title').textContent = id ? 'Editar local' : 'Nuevo local';
     FIELDS.forEach((k) => { $('#sd-' + k).value = st[k] || ''; });
+    ui.sdFoto = { current: st.foto || null, data: undefined, removed: false };
+    sdPrev();
     if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
     setTimeout(() => $('#sd-nombre').focus(), 50);
   }
@@ -511,6 +605,12 @@
     const data = {};
     FIELDS.forEach((k) => { data[k] = $('#sd-' + k).value.trim(); });
     if (!data.nombre) return;
+
+    const previo = ui.editingStoreId ? getStore(ui.editingStoreId) : null;
+    let foto = previo ? previo.foto || null : null;
+    if (ui.sdFoto && ui.sdFoto.data) { foto = foto || uid(); fotoSet(foto, ui.sdFoto.data); }
+    else if (ui.sdFoto && ui.sdFoto.removed) foto = null;
+    data.foto = foto;
 
     if (ui.editingStoreId) {
       Object.assign(getStore(ui.editingStoreId), data);
@@ -527,6 +627,84 @@
     closeStoreDialog();
     render();
   });
+
+  /* ---------- Foto dentro del diálogo "Nuevo/Editar local" ---------- */
+  function sdPrev() {
+    const f = ui.sdFoto || {};
+    const url = f.removed ? null : (f.data || fotoURL(f.current));
+    $('#sd-prev').innerHTML = url ? `<img src="${url}" alt="">` : '<span>Sin foto</span>';
+    $('#sd-del-btn').hidden = !url;
+  }
+  async function sdElegida(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      ui.sdFoto.data = await procesarFoto(file);
+      ui.sdFoto.removed = false;
+      sdPrev();
+    } catch (e) { toast('⚠️ No se pudo leer esa imagen'); }
+  }
+  $('#sd-cam-btn').addEventListener('click', () => $('#sd-cam').click());
+  $('#sd-gal-btn').addEventListener('click', () => $('#sd-gal').click());
+  $('#sd-cam').addEventListener('change', (e) => sdElegida(e.target));
+  $('#sd-gal').addEventListener('change', (e) => sdElegida(e.target));
+  $('#sd-del-btn').addEventListener('click', () => { ui.sdFoto.data = undefined; ui.sdFoto.removed = true; sdPrev(); });
+
+  /* ---------- Ventana de foto (producto o local) ---------- */
+  const pd = $('#photoDialog');
+  const pdTarget = { kind: null, id: null };
+
+  function pdObj() {
+    if (pdTarget.kind === 'store') return getStore(pdTarget.id);
+    const s = getSession();
+    return s ? s.items.find((q) => q.id === pdTarget.id) : null;
+  }
+  function pdRefresh() {
+    const o = pdObj();
+    if (!o) return;
+    const url = fotoURL(o.foto);
+    $('#pd-title').textContent = (pdTarget.kind === 'store' ? '🏪 ' : '📦 ') + (o.nombre || '');
+    $('#pd-img').hidden = !url;
+    if (url) $('#pd-img').src = url; else $('#pd-img').removeAttribute('src');
+    $('#pd-empty').hidden = !!url;
+    $('#pd-del').hidden = !url;
+  }
+  function openPhotoDialog(kind, id) {
+    pdTarget.kind = kind;
+    pdTarget.id = id;
+    if (!pdObj()) return;
+    pdRefresh();
+    if (pd.showModal) pd.showModal(); else pd.setAttribute('open', '');
+  }
+  async function pdElegida(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    const o = pdObj();
+    if (!file || !o) return;
+    try {
+      const data = await procesarFoto(file);
+      const fid = o.foto || uid();
+      fotoSet(fid, data);
+      o.foto = fid;
+      save();
+      pdRefresh();
+      render();
+    } catch (e) { toast('⚠️ No se pudo leer esa imagen'); }
+  }
+  $('#pd-cam-btn').addEventListener('click', () => $('#pd-cam').click());
+  $('#pd-gal-btn').addEventListener('click', () => $('#pd-gal').click());
+  $('#pd-cam').addEventListener('change', (e) => pdElegida(e.target));
+  $('#pd-gal').addEventListener('change', (e) => pdElegida(e.target));
+  $('#pd-del').addEventListener('click', () => {
+    const o = pdObj();
+    if (!o || !o.foto) return;
+    o.foto = null;
+    save();
+    pdRefresh();
+    render();
+  });
+  $('#pd-close').addEventListener('click', () => { if (pd.close) pd.close(); else pd.removeAttribute('open'); });
 
   /* =====================================================
      Acciones de sesión
@@ -556,7 +734,7 @@
       id: uid(),
       titulo: (o.titulo || 'Lista') + ' (repetida)',
       fecha: hoy(),
-      items: o.items.map((it) => ({ id: uid(), nombre: it.nombre, cantidad: it.cantidad, unidad: it.unidad, comprado: false })),
+      items: o.items.map((it) => ({ id: uid(), nombre: it.nombre, cantidad: it.cantidad, unidad: it.unidad, comprado: false, foto: it.foto || null })),
       storeIds: [...o.storeIds],
       prices: {},
       creada: Date.now()
@@ -637,7 +815,7 @@
   }
 
   function exportBackup() {
-    download(`cotizador-respaldo-${hoy()}.json`, JSON.stringify(state, null, 1), 'application/json');
+    download(`cotizador-respaldo-${hoy()}.json`, JSON.stringify(Object.assign({}, state, { photos: Object.fromEntries(FOTOS.cache) })), 'application/json');
     toast('Respaldo descargado');
   }
 
@@ -648,6 +826,10 @@
         const d = JSON.parse(reader.result);
         if (!d || !Array.isArray(d.stores) || !Array.isArray(d.sessions)) throw new Error('formato');
         if (!confirm('Esto reemplaza todos los datos actuales por los del respaldo. ¿Continuar?')) return;
+        const fotosResp = d.photos || {};
+        delete d.photos;
+        Array.from(FOTOS.cache.keys()).forEach(fotoDel);
+        Object.keys(fotosResp).forEach((k) => fotoSet(k, fotosResp[k]));
         state = d;
         state.sessions.forEach((x) => { x.items = x.items || []; x.storeIds = x.storeIds || []; x.prices = x.prices || {}; });
         ui.sessionId = null;
@@ -750,6 +932,8 @@
         break;
       }
 
+      case 'item-photo': openPhotoDialog('item', id); break;
+      case 'store-photo': openPhotoDialog('store', id); break;
       case 'share-wa': shareWhatsApp(); break;
       case 'share-store': shareWhatsApp(id); break;
       case 'buy-store': ui.buyStore = id; refreshComputed(); break;
@@ -839,6 +1023,7 @@
      ===================================================== */
   if (state.ultima && state.sessions.some((x) => x.id === state.ultima)) ui.sessionId = state.ultima;
   render();
+  fotosInit().then(() => { if (FOTOS.cache.size) render(); });
 
   // Pantalla de inicio: se quita sola (también con un toque)
   const splash = document.getElementById('splash');
