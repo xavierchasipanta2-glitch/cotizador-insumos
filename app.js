@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.1.0';
+  const APP_VERSION = '1.1.1';
   const KEY = 'cotizador-insumos-v1';
 
   /* =====================================================
@@ -258,15 +258,15 @@
     const body = s.items.map((it) => `
       <tr data-item="${it.id}" class="${it.comprado ? 'done' : ''}">
         <td class="c-item">
-          <div class="top">
-            <input type="checkbox" data-act="toggle-bought" data-id="${it.id}" ${it.comprado ? 'checked' : ''} title="Marcar como comprado">
-            <input class="nm" data-field="name" data-id="${it.id}" value="${esc(it.nombre)}">
-            <button class="x" data-act="del-item" data-id="${it.id}" title="Eliminar material">🗑</button>
-          </div>
+          <textarea class="nm" rows="2" data-field="name" data-id="${it.id}" aria-label="Nombre del material">${esc(it.nombre)}</textarea>
         </td>
         <td class="c-qty">
           <input class="in azul qty" type="number" inputmode="decimal" min="0" step="any" data-field="qty" data-id="${it.id}" value="${esc(it.cantidad)}">
-          <span class="un">${esc(it.unidad)}</span>
+          <div class="un-row">
+            <input type="checkbox" data-act="toggle-bought" data-id="${it.id}" ${it.comprado ? 'checked' : ''} title="Marcar como comprado">
+            <span class="un">${esc(it.unidad)}</span>
+            <button class="x" data-act="del-item" data-id="${it.id}" title="Eliminar material">🗑</button>
+          </div>
         </td>
         ${stores.map((st) => {
           const cell = (s.prices[it.id] && s.prices[it.id][st.id]) || {};
@@ -287,11 +287,11 @@
         <h2>Precios por local</h2>
         <div class="tbl-scroll">
           <table class="grid">
-            <thead><tr><th class="th-corner" colspan="2">Material · Cantidad</th>${head}</tr></thead>
+            <thead><tr><th class="th-item">Material</th><th class="th-corner">Cant.</th>${head}</tr></thead>
             <tbody>${body}</tbody>
             <tfoot>
-              <tr class="tot"><td class="lbl-cell" colspan="2">Total del local</td>${stores.map((st) => `<td class="c-total" data-total="${st.id}">—</td>`).join('')}</tr>
-              <tr class="cnt"><td class="lbl-cell" colspan="2">Materiales cotizados</td>${stores.map((st) => `<td data-count="${st.id}">0/0</td>`).join('')}</tr>
+              <tr class="tot"><td class="lbl-cell">Total del local</td><td class="blank"></td>${stores.map((st) => `<td class="c-total" data-total="${st.id}">—</td>`).join('')}</tr>
+              <tr class="cnt"><td class="lbl-cell">Cotizados</td><td class="blank"></td>${stores.map((st) => `<td data-count="${st.id}">0/0</td>`).join('')}</tr>
             </tfoot>
           </table>
         </div>
@@ -710,6 +710,10 @@
     }
     save();
     refreshComputed();
+  });
+
+  app.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.matches('textarea.nm')) { e.preventDefault(); e.target.blur(); }
   });
 
   app.addEventListener('submit', (e) => {
