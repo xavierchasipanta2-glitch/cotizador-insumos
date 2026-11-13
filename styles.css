@@ -202,6 +202,15 @@ tfoot td.c-total.best { background: var(--verde-bg); border-color: var(--verde-b
 .sum-line.ok { color: #166534; border-bottom: 0; }
 .sum-line b { white-space: nowrap; }
 
+/* ---------- Locales de la sesión ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-add {
+  border: 2px solid var(--gris-bd); background: var(--gris-bg); color: var(--text); border-radius: 999px;
+  padding: 9px 15px; font-family: inherit; font-size: .95rem; font-weight: 600; cursor: pointer;
+}
+.chip-add:active { transform: scale(.96); }
+.chip-add.all { background: var(--teal); border-color: var(--teal); color: #fff; }
+
 /* ---------- Qué comprar dónde ---------- */
 #buy-wrap { scroll-margin-top: 64px; }
 .buy-section { padding: 14px 12px; border-color: #94a3b8; }

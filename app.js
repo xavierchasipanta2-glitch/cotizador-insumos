@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '1.2.0';
+  const APP_VERSION = '1.2.1';
   const KEY = 'cotizador-insumos-v1';
 
   /* =====================================================
@@ -223,12 +223,15 @@
 
       <div class="card">
         <h2>Locales de esta sesión</h2>
-        <div class="row gap wrap">
-          <select class="in gris grow" id="add-store-select">
-            <option value="">${disponibles.length ? 'Elegir local guardado…' : 'No hay más locales guardados'}</option>
-            ${disponibles.map((st) => `<option value="${st.id}">${esc(st.nombre)}</option>`).join('')}
-          </select>
-          <button class="btn" data-act="add-store-to-session">Agregar</button>
+        <p class="muted" style="margin:-4px 0 8px">En la tabla: ${s.storeIds.map(getStore).filter(Boolean).map((x) => '<b>' + esc(x.nombre) + '</b>').join(', ') || 'ningún local todavía'}.</p>
+        ${disponibles.length ? `
+          <p class="muted" style="margin:0 0 8px">Toca un local guardado para agregarlo a esta lista de precios:</p>
+          <div class="chips">
+            ${disponibles.map((st) => `<button class="chip-add" data-act="add-store" data-id="${st.id}">➕ ${esc(st.nombre)}</button>`).join('')}
+            ${disponibles.length > 1 ? `<button class="chip-add all" data-act="add-all-stores">➕ Agregar todos (${disponibles.length})</button>` : ''}
+          </div>`
+        : `<p class="muted" style="margin:0 0 8px">${state.stores.length ? '✅ Ya están todos tus locales guardados en esta sesión.' : 'Aún no tienes locales guardados.'}</p>`}
+        <div class="row gap wrap" style="margin-top:10px">
           <button class="btn" data-act="new-store-in-session">🆕 Nuevo local</button>
         </div>
       </div>
@@ -515,7 +518,10 @@
       const st = Object.assign({ id: uid() }, data);
       state.stores.push(st);
       const s = getSession();
-      if (ui.addToSession && s) s.storeIds.push(st.id);
+      if (s && !s.storeIds.includes(st.id)) {
+        s.storeIds.push(st.id);
+        if (!ui.addToSession) toast('Local agregado también a la sesión abierta: ' + s.titulo);
+      }
     }
     save();
     closeStoreDialog();
@@ -701,13 +707,17 @@
         break;
       }
 
-      case 'add-store-to-session': {
-        const sel = $('#add-store-select');
-        if (!s || !sel.value) { toast('Elige un local de la lista'); break; }
-        s.storeIds.push(sel.value);
+      case 'add-store':
+        if (!s || s.storeIds.includes(id)) break;
+        s.storeIds.push(id);
         save(); render();
         break;
-      }
+      case 'add-all-stores':
+        if (!s) break;
+        state.stores.forEach((st) => { if (!s.storeIds.includes(st.id)) s.storeIds.push(st.id); });
+        save(); render();
+        toast('Todos los locales agregados a esta sesión');
+        break;
       case 'remove-store':
         if (!s) break;
         s.storeIds = s.storeIds.filter((sid) => sid !== id);
